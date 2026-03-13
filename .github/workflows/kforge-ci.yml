@@ -17,7 +17,8 @@ env:
   KFORGE_CONTEXT: "."
   KFORGE_DEPLOY_PATH: "/srv/flask-ci-demo"
   KFORGE_DEPLOY_TARGET: ""
-  KFORGE_IMAGE: "ghcr.io/${{ github.repository_owner }}/flask-ci-demo"
+  KFORGE_IMAGE: ""
+  KFORGE_IMAGE_NAME: "flask-ci-demo"
   KFORGE_MAIN_BRANCH: "main"
   KFORGE_PLATFORMS: "linux/amd64"
   KFORGE_REGISTRY: "ghcr.io"
@@ -48,6 +49,17 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
           kforge version
+      - name: Resolve image name
+        shell: bash
+        run: |
+          IMAGE="$KFORGE_IMAGE"
+          if [ -z "$IMAGE" ]; then
+            OWNER_LOWER="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+            IMAGE="ghcr.io/${OWNER_LOWER}/${KFORGE_IMAGE_NAME}"
+          fi
+          echo "KFORGE_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo "Resolved image: $IMAGE"
+          echo "KFORGE_REGISTRY=ghcr.io" >> "$GITHUB_ENV"
       - name: Inspect project
         run: kforge detect "$KFORGE_CONTEXT"
       - name: Verify app
@@ -79,6 +91,17 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
           kforge version
+      - name: Resolve image name
+        shell: bash
+        run: |
+          IMAGE="$KFORGE_IMAGE"
+          if [ -z "$IMAGE" ]; then
+            OWNER_LOWER="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+            IMAGE="ghcr.io/${OWNER_LOWER}/${KFORGE_IMAGE_NAME}"
+          fi
+          echo "KFORGE_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo "Resolved image: $IMAGE"
+          echo "KFORGE_REGISTRY=ghcr.io" >> "$GITHUB_ENV"
       - name: Log in to GHCR
         if: env.KFORGE_REGISTRY == 'ghcr.io'
         uses: docker/login-action@v3
