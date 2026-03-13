@@ -1,0 +1,16 @@
+image: flask-ci-demo
+healthcheck: /health
+env:
+  APP_ENV: production
+verify:
+  path: /health
+  timeout_seconds: 20
+ci:
+  main_branch: main
+  platforms:
+    - linux/amd64
+  push: true
+  verify: true
+  auto: true
+  github:
+    workflow: kforge-ci.yml

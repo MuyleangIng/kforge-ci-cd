@@ -1,0 +1,102 @@
+name: kforge-ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: kforge-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  KFORGE_CONTEXT: "."
+  KFORGE_DEPLOY_PATH: "/srv/flask-ci-demo"
+  KFORGE_DEPLOY_TARGET: ""
+  KFORGE_IMAGE: "ghcr.io/${{ github.repository_owner }}/flask-ci-demo"
+  KFORGE_MAIN_BRANCH: "main"
+  KFORGE_PLATFORMS: "linux/amd64"
+  KFORGE_REGISTRY: "ghcr.io"
+  KFORGE_VERIFY_PATH: "/health"
+  KFORGE_VERSION: "v1.0.0"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Install kforge
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL -o /tmp/kforge.tar.gz "https://github.com/MuyleangIng/kforge/releases/download/${KFORGE_VERSION}/kforge_${KFORGE_VERSION#v}_linux_amd64.tar.gz"
+          tar -xzf /tmp/kforge.tar.gz -C /tmp
+          cp /tmp/kforge "$HOME/.local/bin/kforge"
+          chmod +x "$HOME/.local/bin/kforge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          kforge version
+      - name: Inspect project
+        run: kforge detect "$KFORGE_CONTEXT"
+      - name: Verify app
+        run: |
+          kforge verify --progress plain "$KFORGE_CONTEXT"
+
+  publish:
+    if: github.event_name == 'push'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Install kforge
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL -o /tmp/kforge.tar.gz "https://github.com/MuyleangIng/kforge/releases/download/${KFORGE_VERSION}/kforge_${KFORGE_VERSION#v}_linux_amd64.tar.gz"
+          tar -xzf /tmp/kforge.tar.gz -C /tmp
+          cp /tmp/kforge "$HOME/.local/bin/kforge"
+          chmod +x "$HOME/.local/bin/kforge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          kforge version
+      - name: Log in to GHCR
+        if: env.KFORGE_REGISTRY == 'ghcr.io'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to custom registry
+        if: env.KFORGE_REGISTRY != 'ghcr.io'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.KFORGE_REGISTRY }}
+          username: ${{ secrets.KFORGE_REGISTRY_USER }}
+          password: ${{ secrets.KFORGE_REGISTRY_PASSWORD }}
+      - name: Push image
+        shell: bash
+        run: |
+          TAGS=(-t "${KFORGE_IMAGE}:${GITHUB_SHA}")
+          if [ "${GITHUB_REF}" = "refs/heads/${KFORGE_MAIN_BRANCH}" ]; then TAGS+=(-t "${KFORGE_IMAGE}:latest"); fi
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then TAGS+=(-t "${KFORGE_IMAGE}:${GITHUB_REF#refs/tags/}"); fi
+          kforge build --progress plain --auto --platform "$KFORGE_PLATFORMS" --push "${TAGS[@]}" "$KFORGE_CONTEXT"
