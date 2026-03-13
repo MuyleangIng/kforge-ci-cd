@@ -22,7 +22,7 @@ env:
   KFORGE_PLATFORMS: "linux/amd64"
   KFORGE_REGISTRY: "ghcr.io"
   KFORGE_VERIFY_PATH: "/health"
-  KFORGE_VERSION: "v1.0.0"
+  KFORGE_VERSION: "v1.1.0"
 
 jobs:
   check:
